@@ -12,8 +12,10 @@
 
 #pragma once
 
+#include <atomic>
 #include <cstdint>
 #include <functional>
+#include <mutex>
 #include <utility>
 #include <vector>
 
@@ -36,6 +38,8 @@ class CountMinSketch {
 
   CountMinSketch(CountMinSketch &&other) noexcept;                      // Move constructor
   auto operator=(CountMinSketch &&other) noexcept -> CountMinSketch &;  // Move assignment
+
+  ~CountMinSketch() = default;
 
   /**
    * @brief Inserts an item into the count-min sketch
@@ -84,6 +88,8 @@ class CountMinSketch {
   uint32_t depth_;  // Number of independent hash functions
   /** Pre-computed hash functions for each row */
   std::vector<std::function<size_t(const KeyType &)>> hash_functions_;
+  std::vector<std::vector<std::uint32_t>> buckets_;
+  std::vector<std::mutex> mutexes_;
 
   /** @fall2025 PLEASE DO NOT MODIFY THE FOLLOWING */
   constexpr static size_t SEED_BASE = 15445;
@@ -94,7 +100,7 @@ class CountMinSketch {
    * @param seed Used for creating independent hash functions
    * @return A function that maps items to column indices
    */
-  inline auto HashFunction(size_t seed) -> std::function<size_t(const KeyType &)> {
+  auto HashFunction(size_t seed) -> std::function<size_t(const KeyType &)> {
     return [seed, this](const KeyType &item) -> size_t {
       auto h1 = std::hash<KeyType>{}(item);
       auto h2 = bustub::HashUtil::CombineHashes(seed, SEED_BASE);
