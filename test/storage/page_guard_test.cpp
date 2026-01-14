@@ -22,7 +22,7 @@ namespace bustub {
 
 const size_t FRAMES = 10;
 
-TEST(PageGuardTest, DISABLED_DropTest) {
+TEST(PageGuardTest, DropTest) {
   auto disk_manager = std::make_shared<DiskManagerUnlimitedMemory>();
   auto bpm = std::make_shared<BufferPoolManager>(FRAMES, disk_manager.get());
 
@@ -90,7 +90,9 @@ TEST(PageGuardTest, DISABLED_DropTest) {
   // Get a new write page and edit it. We will retrieve it later
   const auto mutable_page_id = bpm->NewPage();
   auto mutable_guard = bpm->WritePage(mutable_page_id);
+  fmt::println("Before: '{}'", mutable_guard.GetDataMut());
   strcpy(mutable_guard.GetDataMut(), "data");  // NOLINT
+  fmt::println("After: '{}'", mutable_guard.GetDataMut());
   mutable_guard.Drop();
 
   {
@@ -105,6 +107,7 @@ TEST(PageGuardTest, DISABLED_DropTest) {
 
   // Fetching the flushed page should result in seeing the changed value.
   auto immutable_guard = bpm->ReadPage(mutable_page_id);
+  fmt::println("Data: '{}'", immutable_guard.GetData());
   ASSERT_EQ(0, std::strcmp("data", immutable_guard.GetData()));
 
   // Shutdown the disk manager and remove the temporary file we created.
@@ -163,7 +166,9 @@ TEST(PageGuardTest, DISABLED_MoveTest) {
   ASSERT_EQ(1, bpm->GetPinCount(pid3));
 
   // This will hang if page 2 was not unlatched correctly.
-  { const auto temp_guard2 = bpm->WritePage(pid2); }
+  {
+    const auto temp_guard2 = bpm->WritePage(pid2);
+  }
 
   auto guard4 = bpm->WritePage(pid4);
   auto guard5 = bpm->WritePage(pid5);
@@ -186,7 +191,9 @@ TEST(PageGuardTest, DISABLED_MoveTest) {
   ASSERT_EQ(1, bpm->GetPinCount(pid5));
 
   // This will hang if page 4 was not unlatched correctly.
-  { const auto temp_guard4 = bpm->ReadPage(pid4); }
+  {
+    const auto temp_guard4 = bpm->ReadPage(pid4);
+  }
 
   // Test move constructor with invalid that
   {

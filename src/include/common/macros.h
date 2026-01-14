@@ -57,10 +57,10 @@ class LogFatalStream {
 
 #define UNIMPLEMENTED(message) throw std::logic_error(message)
 
-#define BUSTUB_ENSURE(expr, message)                  \
-  if (!(expr)) {                                      \
-    std::cerr << "ERROR: " << (message) << std::endl; \
-    std::terminate();                                 \
+#define BUSTUB_ENSURE(expr, message)             \
+  if (!(expr)) {                                 \
+    std::cerr << "ERROR: " << (message) << '\n'; \
+    std::terminate();                            \
   }
 
 #define UNREACHABLE(message) throw std::logic_error(message)

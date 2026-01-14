@@ -77,8 +77,6 @@ class ArcReplacer {
   DISALLOW_COPY_AND_MOVE(ArcReplacer)
 
   /**
-   * TODO(P1): Add implementation
-   *
    * @brief Destroys the LRUReplacer.
    */
   ~ArcReplacer() = default;
@@ -95,7 +93,7 @@ class ArcReplacer {
   static void move_frame_to_hot(FrameStatus &fs, std::list<int> &list);
   static void move_frame_to_ghost(FrameStatus &fs, std::list<int> &list);
 
-  // TODO(student): implement me! You can replace or remove these member variables as you like.
+  // implement me! You can replace or remove these member variables as you like.
   std::list<frame_id_t> mru_;
   std::list<frame_id_t> mfu_;
   std::list<page_id_t> mru_ghost_;
@@ -118,7 +116,7 @@ class ArcReplacer {
   [[maybe_unused]] size_t replacer_size_;
   std::mutex latch_;
 
-  // TODO(student): You can add member variables / functions as you like.
+  // You can add member variables / functions as you like.
 };
 
 }  // namespace bustub

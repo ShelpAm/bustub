@@ -58,14 +58,16 @@ class WritePageGuard;
  */
 class FrameHeader {
   friend class BufferPoolManager;
+  friend class PageGuard;
   friend class ReadPageGuard;
   friend class WritePageGuard;
+  friend void flush_unsafe(page_id_t pid, FrameHeader &frame, DiskScheduler &ds);
 
  public:
   explicit FrameHeader(frame_id_t frame_id);
 
  private:
-  auto GetData() const -> const char *;
+  [[nodiscard]] auto GetData() const -> const char *;
   auto GetDataMut() -> char *;
   void Reset();
 
@@ -76,10 +78,10 @@ class FrameHeader {
   std::shared_mutex rwlatch_;
 
   /** @brief The number of pins on this frame keeping the page in memory. */
-  std::atomic<size_t> pin_count_;
+  std::atomic<size_t> pin_count_{};
 
   /** @brief The dirty flag. */
-  bool is_dirty_;
+  bool is_dirty_{};
 
   /**
    * @brief A pointer to the data of the page that this frame holds.
@@ -109,6 +111,10 @@ class FrameHeader {
  */
 class BufferPoolManager {
  public:
+  BufferPoolManager(const BufferPoolManager &) = delete;
+  BufferPoolManager(BufferPoolManager &&) = delete;
+  BufferPoolManager &operator=(const BufferPoolManager &) = delete;
+  BufferPoolManager &operator=(BufferPoolManager &&) = delete;
   BufferPoolManager(size_t num_frames, DiskManager *disk_manager, LogManager *log_manager = nullptr);
   ~BufferPoolManager();
 
@@ -127,6 +133,12 @@ class BufferPoolManager {
   auto GetPinCount(page_id_t page_id) -> std::optional<size_t>;
 
  private:
+  std::shared_ptr<FrameHeader> get_frame(frame_id_t id);
+
+  // If there is a free frame, returns its id, or if we can get one by evicting a page and its associated frame,
+  // evict it and return its id.
+  std::optional<frame_id_t> try_get_free_frame();
+
   /** @brief The number of frames in the buffer pool. */
   const size_t num_frames_;
 
@@ -136,7 +148,8 @@ class BufferPoolManager {
   /**
    * @brief The latch protecting the buffer pool's inner data structures.
    *
-   * TODO(P1) We recommend replacing this comment with details about what this latch actually protects.
+   * This latch protects the bpm from being corrupted when multiple threads try
+   * to access or modify the buffer pool's state.
    */
   std::shared_ptr<std::mutex> bpm_latch_;
 
@@ -162,8 +175,11 @@ class BufferPoolManager {
    */
   LogManager *log_manager_ __attribute__((__unused__));
 
+  // No need to track index of frame because the index is the same as frame id.
+  // std::unordered_map<frame_id_t, std::size_t> index_of_frame_;
+
   /**
-   * TODO(P1): You may add additional private members and helper functions if you find them necessary.
+   * You may add additional private members and helper functions if you find them necessary.
    *
    * There will likely be a lot of code duplication between the different modes of accessing a page.
    *

@@ -26,8 +26,6 @@ namespace bustub {
 ArcReplacer::ArcReplacer(size_t num_frames) : replacer_size_(num_frames) {}
 
 /**
- * TODO(P1): Add implementation
- *
  * @brief Performs the Replace operation as described by the writeup
  * that evicts from either mfu_ or mru_ into its corresponding ghost list
  * according to balancing policy.
@@ -74,18 +72,12 @@ auto ArcReplacer::Evict() -> std::optional<frame_id_t> {
     return fid;
   };
 
-  if (auto res = try_evict_from(*first, *first_ghost); res.has_value()) {
-    return res;
-  }
-  if (auto res = try_evict_from(*second, *second_ghost); res.has_value()) {
-    return res;
-  }
+  if (auto res = try_evict_from(*first, *first_ghost); res.has_value()) return res;
+  if (auto res = try_evict_from(*second, *second_ghost); res.has_value()) return res;
   return std::nullopt;
 }
 
 /**
- * TODO(P1): Add implementation
- *
  * @brief Record access to a frame, adjusting ARC bookkeeping accordingly
  * by bring the accessed page to the front of mfu_ if it exists in any of the lists
  * or the front of mru_ if it does not.
@@ -160,8 +152,6 @@ void ArcReplacer::RecordAccess(frame_id_t frame_id, page_id_t page_id, [[maybe_u
 }
 
 /**
- * TODO(P1): Add implementation
- *
  * @brief Toggle whether a frame is evictable or non-evictable. This function also
  * controls replacer's size. Note that size is equal to number of evictable entries.
  *
@@ -179,7 +169,7 @@ void ArcReplacer::RecordAccess(frame_id_t frame_id, page_id_t page_id, [[maybe_u
 void ArcReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
   auto it = alive_map_.find(frame_id);
   if (it == alive_map_.end()) {
-    throw std::invalid_argument{"Invalid frame id"};
+    throw std::invalid_argument{"Invalid frame id " + std::to_string(frame_id)};
   }
   auto &frame_status = it->second;
   curr_size_ += static_cast<std::size_t>(set_evictable) - static_cast<std::size_t>(frame_status->evictable_);
@@ -187,8 +177,6 @@ void ArcReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
 }
 
 /**
- * TODO(P1): Add implementation
- *
  * @brief Remove an evictable frame from replacer.
  * This function should also decrement replacer's size if removal is successful.
  *
