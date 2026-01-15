@@ -332,8 +332,6 @@ auto BufferPoolManager::FlushPage(page_id_t page_id) -> bool {
  *
  * You should probably leave implementing this function until after you have completed `CheckedReadPage`,
  * `CheckedWritePage`, and `FlushPage`, as it will likely be much easier to understand what to do.
- *
- * TODO(P1): Add implementation
  */
 void BufferPoolManager::FlushAllPagesUnsafe() {
   for (auto [pid, fid] : page_table_) {
@@ -350,8 +348,6 @@ void BufferPoolManager::FlushAllPagesUnsafe() {
  *
  * You should probably leave implementing this function until after you have completed `CheckedReadPage`,
  * `CheckedWritePage`, and `FlushPage`, as it will likely be much easier to understand what to do.
- *
- * TODO(P1): Add implementation
  */
 void BufferPoolManager::FlushAllPages() {
   std::scoped_lock lock(*bpm_latch_);

@@ -96,8 +96,6 @@ class FrameHeader {
   std::vector<char> data_;
 
   /**
-   * TODO(P1): You may add any fields or helper functions under here that you think are necessary.
-   *
    * One potential optimization you could make is storing an optional page ID of the page that the `FrameHeader` is
    * currently storing. This might allow you to skip searching for the corresponding (page ID, frame ID) pair somewhere
    * else in the buffer pool manager...
