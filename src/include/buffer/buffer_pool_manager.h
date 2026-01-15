@@ -27,9 +27,13 @@
 
 namespace bustub {
 
+class FrameHeader;
 class BufferPoolManager;
 class ReadPageGuard;
 class WritePageGuard;
+
+void flush_unsafe(page_id_t pid, FrameHeader &frame, DiskScheduler &ds);
+void read_unsafe(page_id_t pid, FrameHeader &frame, DiskScheduler &ds);
 
 /**
  * @brief A helper class for `BufferPoolManager` that manages a frame of memory and related metadata.
@@ -62,6 +66,7 @@ class FrameHeader {
   friend class ReadPageGuard;
   friend class WritePageGuard;
   friend void flush_unsafe(page_id_t pid, FrameHeader &frame, DiskScheduler &ds);
+  friend void read_unsafe(page_id_t pid, FrameHeader &frame, DiskScheduler &ds);
 
  public:
   explicit FrameHeader(frame_id_t frame_id);
@@ -138,6 +143,8 @@ class BufferPoolManager {
   // If there is a free frame, returns its id, or if we can get one by evicting a page and its associated frame,
   // evict it and return its id.
   std::optional<frame_id_t> try_get_free_frame();
+
+  std::shared_ptr<FrameHeader> load_page_unsafe(page_id_t pid);
 
   /** @brief The number of frames in the buffer pool. */
   const size_t num_frames_;

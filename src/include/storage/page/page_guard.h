@@ -24,8 +24,6 @@ namespace bustub {
 class BufferPoolManager;
 class FrameHeader;
 
-void flush_unsafe(page_id_t pid, FrameHeader &frame, DiskScheduler &ds);
-
 /**
  * @brief An RAII object that grants thread-safe read access to a page of data.
  *
@@ -38,6 +36,8 @@ void flush_unsafe(page_id_t pid, FrameHeader &frame, DiskScheduler &ds);
 class ReadPageGuard {
   /** @brief Only the buffer pool manager is allowed to construct a valid `ReadPageGuard.` */
   friend class BufferPoolManager;
+
+  friend void swap(ReadPageGuard &lhs, ReadPageGuard &rhs) noexcept;
 
  public:
   /**
@@ -142,6 +142,8 @@ class WritePageGuard {
   /** @brief Only the buffer pool manager is allowed to construct a valid `WritePageGuard.` */
   friend class BufferPoolManager;
 
+  friend void swap(WritePageGuard &lhs, WritePageGuard &rhs) noexcept;
+
  public:
   /**
    * @brief The default constructor for a `WritePageGuard`.
@@ -182,7 +184,7 @@ class WritePageGuard {
                           std::shared_ptr<std::mutex> bpm_latch, std::shared_ptr<DiskScheduler> disk_scheduler);
 
   /** @brief The page ID of the page we are guarding. */
-  page_id_t page_id_;
+  page_id_t page_id_{-1};
 
   /**
    * @brief The frame that holds the page this guard is protecting.

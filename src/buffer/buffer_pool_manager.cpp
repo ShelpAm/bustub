@@ -39,7 +39,10 @@ auto FrameHeader::GetData() const -> const char * { return data_.data(); }
  *
  * @return char* A pointer to mutable data that the frame stores.
  */
-auto FrameHeader::GetDataMut() -> char * { return data_.data(); }
+auto FrameHeader::GetDataMut() -> char * {
+  is_dirty_ = true;
+  return data_.data();
+}
 
 /**
  * @brief Resets a `FrameHeader`'s member fields.
@@ -179,21 +182,14 @@ auto BufferPoolManager::DeletePage(page_id_t page_id) -> bool {
  */
 auto BufferPoolManager::CheckedWritePage(page_id_t page_id, [[maybe_unused]] AccessType access_type)
     -> std::optional<WritePageGuard> {
-  std::scoped_lock guard(*bpm_latch_);
-
-  // Case 2
-  if (page_table_.count(page_id) != 0) {
-    replacer_->RecordAccess(page_table_.at(page_id), page_id, access_type);
-    return WritePageGuard(page_id, get_frame(page_table_.at(page_id)), replacer_, bpm_latch_, disk_scheduler_);
+  std::shared_ptr<FrameHeader> frame;
+  {
+    std::scoped_lock guard(*bpm_latch_);
+    frame = load_page_unsafe(page_id);
+    if (!frame) return std::nullopt;
+    replacer_->RecordAccess(frame->frame_id_, page_id, access_type);
   }
-
-  // Case 1 & 3
-  auto freeframe = try_get_free_frame();
-  if (!freeframe.has_value()) return std::nullopt;
-
-  page_table_.insert({page_id, *freeframe});
-  replacer_->RecordAccess(*freeframe, page_id, access_type);
-  return WritePageGuard(page_id, get_frame(*freeframe), replacer_, bpm_latch_, disk_scheduler_);
+  return WritePageGuard(page_id, frame, replacer_, bpm_latch_, disk_scheduler_);
 }
 
 /**
@@ -220,22 +216,14 @@ auto BufferPoolManager::CheckedWritePage(page_id_t page_id, [[maybe_unused]] Acc
  */
 auto BufferPoolManager::CheckedReadPage(page_id_t page_id, [[maybe_unused]] AccessType access_type)
     -> std::optional<ReadPageGuard> {
-  std::scoped_lock guard(*bpm_latch_);
-
-  // Case 2
-  if (page_table_.count(page_id) != 0) {
-    auto fid = page_table_.at(page_id);
-    replacer_->RecordAccess(fid, page_id, access_type);
-    return ReadPageGuard(page_id, get_frame(fid), replacer_, bpm_latch_, disk_scheduler_);
+  std::shared_ptr<FrameHeader> frame;
+  {
+    std::scoped_lock guard(*bpm_latch_);
+    frame = load_page_unsafe(page_id);
+    if (!frame) return std::nullopt;
+    replacer_->RecordAccess(frame->frame_id_, page_id, access_type);
   }
-
-  // Case 1 & 3
-  auto freeframe = try_get_free_frame();
-  if (!freeframe.has_value()) return std::nullopt;
-
-  page_table_.insert({page_id, *freeframe});
-  replacer_->RecordAccess(*freeframe, page_id, access_type);
-  return ReadPageGuard(page_id, get_frame(*freeframe), replacer_, bpm_latch_, disk_scheduler_);
+  return ReadPageGuard(page_id, frame, replacer_, bpm_latch_, disk_scheduler_);
 }
 
 /**
@@ -424,6 +412,46 @@ std::optional<frame_id_t> BufferPoolManager::try_get_free_frame() {
   auto freeframe = free_frames_.back();
   free_frames_.pop_back();
   return freeframe;
+}
+
+void flush_unsafe(page_id_t pid, FrameHeader &frame, DiskScheduler &ds) {
+  if (!frame.is_dirty_) return;
+
+  std::vector<DiskRequest> work;
+  auto promise = ds.CreatePromise();
+  auto future = promise.get_future();
+  work.push_back(DiskRequest{true, frame.GetDataMut(), pid, std::move(promise)});
+  ds.Schedule(work);
+  frame.is_dirty_ = false;
+  future.wait();
+  fmt::println(R"(Flushed page {}: "{}")", pid, frame.GetData());
+}
+
+void read_unsafe(page_id_t pid, FrameHeader &frame, DiskScheduler &ds) {
+  std::vector<DiskRequest> requests;
+  auto promise = ds.CreatePromise();
+  auto future = promise.get_future();
+  requests.push_back(DiskRequest{false, frame.GetDataMut(), pid, std::move(promise)});
+  ds.Schedule(requests);
+  future.wait();
+  fmt::println(R"(Read page {}: "{}")", pid, frame.GetData());
+}
+
+std::shared_ptr<FrameHeader> BufferPoolManager::load_page_unsafe(page_id_t pid) {
+  frame_id_t fid;
+  std::shared_ptr<FrameHeader> frame;
+  if (page_table_.count(pid) != 0) {
+    fid = page_table_.at(pid);
+    frame = get_frame(fid);
+  } else {
+    auto freefid = try_get_free_frame();
+    if (!freefid.has_value()) return nullptr;
+    fid = *freefid;
+    page_table_.insert({pid, fid});
+    frame = get_frame(fid);
+    read_unsafe(pid, *frame, *disk_scheduler_);
+  }
+  return frame;
 }
 
 }  // namespace bustub

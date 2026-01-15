@@ -17,6 +17,28 @@
 
 namespace bustub {
 
+void swap(ReadPageGuard &lhs, ReadPageGuard &rhs) noexcept {
+  using std::swap;
+  std::swap(lhs.page_id_, rhs.page_id_);
+  std::swap(lhs.frame_, rhs.frame_);
+  std::swap(lhs.replacer_, rhs.replacer_);
+  std::swap(lhs.bpm_latch_, rhs.bpm_latch_);
+  std::swap(lhs.disk_scheduler_, rhs.disk_scheduler_);
+  std::swap(lhs.is_valid_, rhs.is_valid_);
+  std::swap(lhs.read_lock_, rhs.read_lock_);
+}
+
+void swap(WritePageGuard &lhs, WritePageGuard &rhs) noexcept {
+  using std::swap;
+  std::swap(lhs.page_id_, rhs.page_id_);
+  std::swap(lhs.frame_, rhs.frame_);
+  std::swap(lhs.replacer_, rhs.replacer_);
+  std::swap(lhs.bpm_latch_, rhs.bpm_latch_);
+  std::swap(lhs.disk_scheduler_, rhs.disk_scheduler_);
+  std::swap(lhs.is_valid_, rhs.is_valid_);
+  std::swap(lhs.write_lock_, rhs.write_lock_);
+}
+
 /**
  * @brief The only constructor for an RAII `ReadPageGuard` that creates a valid guard.
  *
@@ -41,15 +63,6 @@ ReadPageGuard::ReadPageGuard(page_id_t page_id, std::shared_ptr<FrameHeader> fra
   ++frame_->pin_count_;
   // At least one pin count, so inevictable.
   replacer_->SetEvictable(frame_->frame_id_, false);
-
-  std::vector<DiskRequest> requests;
-  auto promise = disk_scheduler_->CreatePromise();
-  auto future = promise.get_future();
-  requests.push_back(DiskRequest{false, frame_->GetDataMut(), page_id_, std::move(promise)});
-  fmt::println("page {} Before load from disk: '{}'", page_id, frame_->GetDataMut());
-  disk_scheduler_->Schedule(requests);
-  future.wait();
-  fmt::println("page {} After load from disk: '{}'", page_id, frame_->GetDataMut());
 }
 
 /**
@@ -66,14 +79,12 @@ ReadPageGuard::ReadPageGuard(page_id_t page_id, std::shared_ptr<FrameHeader> fra
  * @param that The other page guard.
  */
 ReadPageGuard::ReadPageGuard(ReadPageGuard &&that) noexcept
-    : page_id_(that.page_id_),
+    : page_id_(std::exchange(that.page_id_, -1)),
       frame_(std::move(that.frame_)),
       replacer_(std::move(that.replacer_)),
       bpm_latch_(std::move(that.bpm_latch_)),
-      is_valid_(that.is_valid_),
-      read_lock_(std::move(that.read_lock_)) {
-  if (&that != this) that.is_valid_ = false;
-}
+      is_valid_(std::exchange(that.is_valid_, false)),
+      read_lock_(std::move(that.read_lock_)) {}
 
 /**
  * @brief The move assignment operator for `ReadPageGuard`.
@@ -91,14 +102,8 @@ ReadPageGuard::ReadPageGuard(ReadPageGuard &&that) noexcept
  * @return ReadPageGuard& The newly valid `ReadPageGuard`.
  */
 auto ReadPageGuard::operator=(ReadPageGuard &&that) noexcept -> ReadPageGuard & {
-  page_id_ = that.page_id_;
-  frame_ = std::move(that.frame_);
-  replacer_ = std::move(that.replacer_);
-  bpm_latch_ = std::move(that.bpm_latch_);
-  is_valid_ = that.is_valid_;
-  read_lock_ = std::move(that.read_lock_);
-
-  if (&that != this) that.is_valid_ = false;
+  auto other = std::move(that);
+  swap(*this, other);
   return *this;
 }
 
@@ -196,14 +201,12 @@ WritePageGuard::WritePageGuard(page_id_t page_id, std::shared_ptr<FrameHeader> f
  * @param that The other page guard.
  */
 WritePageGuard::WritePageGuard(WritePageGuard &&that) noexcept
-    : page_id_(that.page_id_),
+    : page_id_(std::exchange(that.page_id_, -1)),
       frame_(std::move(that.frame_)),
       replacer_(std::move(that.replacer_)),
       bpm_latch_(std::move(that.bpm_latch_)),
-      is_valid_(that.is_valid_),
-      write_lock_(std::move(that.write_lock_)) {
-  that.is_valid_ = false;
-}
+      is_valid_(std::exchange(that.is_valid_, false)),
+      write_lock_(std::move(that.write_lock_)) {}
 
 /**
  * @brief The move assignment operator for `WritePageGuard`.
@@ -221,16 +224,8 @@ WritePageGuard::WritePageGuard(WritePageGuard &&that) noexcept
  * @return WritePageGuard& The newly valid `WritePageGuard`.
  */
 auto WritePageGuard::operator=(WritePageGuard &&that) noexcept -> WritePageGuard & {
-  page_id_ = that.page_id_;
-  frame_ = std::move(that.frame_);
-  replacer_ = std::move(that.replacer_);
-  bpm_latch_ = std::move(that.bpm_latch_);
-  is_valid_ = that.is_valid_;
-  write_lock_ = std::move(that.write_lock_);
-
-  if (this != &that) {
-    that.is_valid_ = false;
-  }
+  auto other = std::move(that);
+  swap(*this, other);
   return *this;
 }
 
@@ -256,7 +251,6 @@ auto WritePageGuard::GetData() const -> const char * {
 auto WritePageGuard::GetDataMut() -> char * {
   BUSTUB_ENSURE(is_valid_, "tried to use an invalid write guard");
   // Shall we assume the data is dirty when this method invoked?
-  frame_->is_dirty_ = true;
   return frame_->GetDataMut();
 }
 
@@ -294,16 +288,4 @@ void WritePageGuard::Drop() {
 /** @brief The destructor for `WritePageGuard`. This destructor simply calls `Drop()`. */
 WritePageGuard::~WritePageGuard() { Drop(); }
 
-void flush_unsafe(page_id_t pid, FrameHeader &frame, DiskScheduler &ds) {
-  if (!frame.is_dirty_) return;
-
-  std::vector<DiskRequest> work;
-  auto promise = ds.CreatePromise();
-  auto future = promise.get_future();
-  work.push_back(DiskRequest{true, frame.GetDataMut(), pid, std::move(promise)});
-  ds.Schedule(work);
-  frame.is_dirty_ = false;
-  future.wait();
-  fmt::println("Unsafely flushed page {}, data: '{}'", pid, frame.GetData());
-}
 }  // namespace bustub

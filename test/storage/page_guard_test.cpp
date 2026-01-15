@@ -90,9 +90,7 @@ TEST(PageGuardTest, DropTest) {
   // Get a new write page and edit it. We will retrieve it later
   const auto mutable_page_id = bpm->NewPage();
   auto mutable_guard = bpm->WritePage(mutable_page_id);
-  fmt::println("Before: '{}'", mutable_guard.GetDataMut());
   strcpy(mutable_guard.GetDataMut(), "data");  // NOLINT
-  fmt::println("After: '{}'", mutable_guard.GetDataMut());
   mutable_guard.Drop();
 
   {
@@ -107,14 +105,13 @@ TEST(PageGuardTest, DropTest) {
 
   // Fetching the flushed page should result in seeing the changed value.
   auto immutable_guard = bpm->ReadPage(mutable_page_id);
-  fmt::println("Data: '{}'", immutable_guard.GetData());
   ASSERT_EQ(0, std::strcmp("data", immutable_guard.GetData()));
 
   // Shutdown the disk manager and remove the temporary file we created.
   disk_manager->ShutDown();
 }
 
-TEST(PageGuardTest, DISABLED_MoveTest) {
+TEST(PageGuardTest, MoveTest) {
   auto disk_manager = std::make_shared<DiskManagerUnlimitedMemory>();
   auto bpm = std::make_shared<BufferPoolManager>(FRAMES, disk_manager.get());
 
