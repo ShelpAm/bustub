@@ -424,7 +424,7 @@ void flush_unsafe(page_id_t pid, FrameHeader &frame, DiskScheduler &ds) {
   ds.Schedule(work);
   frame.is_dirty_ = false;
   future.wait();
-  fmt::println(R"(Flushed page {}: "{}")", pid, frame.GetData());
+  // fmt::println(R"(Flushed page {}: "{}")", pid, frame.GetData());
 }
 
 void read_unsafe(page_id_t pid, FrameHeader &frame, DiskScheduler &ds) {
@@ -434,7 +434,7 @@ void read_unsafe(page_id_t pid, FrameHeader &frame, DiskScheduler &ds) {
   requests.push_back(DiskRequest{false, frame.GetDataMut(), pid, std::move(promise)});
   ds.Schedule(requests);
   future.wait();
-  fmt::println(R"(Read page {}: "{}")", pid, frame.GetData());
+  // fmt::println(R"(Read page {}: "{}")", pid, frame.GetData());
 }
 
 std::shared_ptr<FrameHeader> BufferPoolManager::load_page_unsafe(page_id_t pid) {
